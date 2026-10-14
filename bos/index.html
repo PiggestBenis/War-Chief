@@ -1011,8 +1011,12 @@
         };
         const render = () => {
           try {
-            if ((location.hash.replace(/^#/, '').split('/')[0] || '') === 'settings') { renderSettings(mount, desk); return; }
-            if ((location.hash.replace(/^#/, '').split('/')[0] || '') === 'company') { renderSettings(mount, desk, { company: true }); return; }
+            if ((location.hash.replace(/^#/, '').split('/')[0] || '') === 'settings') {
+              const pane = (location.hash.replace(/^#/, '').split('/')[1] || '') === 'customize' ? 'customize' : ((location.hash.replace(/^#/, '').split('/')[1] || '') === 'account' ? 'account' : 'companies');
+              renderSettings(mount, desk, { pane });
+              return;
+            }
+            if ((location.hash.replace(/^#/, '').split('/')[0] || '') === 'company') { renderSettings(mount, desk, { pane: 'companies' }); return; }
             if (typeof current.render === 'function' && current.render.length >= 2 && extras.includes(current)) current.render(mount, store);
             else current.render(mount, desk);
           } catch (e) {

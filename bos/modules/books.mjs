@@ -240,7 +240,7 @@ export function renderSettings(el, desk, opts = {}) {
   const store = desk.store;
   const esc = store.esc;
   const s = store.settings;
-  const only = opts.company === true;
+  const pane = opts.pane === 'customize' || opts.pane === 'account' ? opts.pane : 'companies';
   const taxShown = Number(s.taxRate) ? V.round2(Number(s.taxRate) * 100) : (!s.taxExempt && s.state && salesTaxOf(s.state) ? String(Math.round(salesTaxOf(s.state) * 10000) / 100) : '');
   const companyFields = `
     ${cell('Company name', `<input class="f" id="co-name-in" value="${esc(s.company)}" maxlength="120" />`)}
@@ -258,29 +258,42 @@ export function renderSettings(el, desk, opts = {}) {
       ${s.logo ? '<button type="button" class="chip" data-do="logo-off">Remove the logo</button>' : ''}
     </div>`;
   el.innerHTML = `
-    <h1 class="title">${only ? 'Company' : 'Settings'}</h1>
-    ${backup ? `<div class="card"><h3 class="sub" style="margin-top:0">Bring in ${esc(backup.name)}?</h3>
+    <h1 class="title">${pane === 'customize' ? 'Customize' : pane === 'account' ? 'Account' : 'Companies'}</h1>
+    ${pane === 'companies' && backup ? `<div class="card"><h3 class="sub" style="margin-top:0">Bring in ${esc(backup.name)}?</h3>
       <p>It is a backup from ${esc(String(backup.json.exported ?? '').slice(0, 10) || 'an unknown day')}. Bringing it in replaces everything on this desk with what it holds; one Undo puts this desk back as it was.</p>
       <div class="btns"><button type="button" class="btn fill" data-do="backup-yes">Bring it in</button><button type="button" class="btn" data-do="backup-no">Not now</button></div></div>` : ''}
-    ${companyFields}
-    ${only ? '' : themeChips(s.paper, s.line, esc)}
-    ${only ? '' : `<p class="k" style="margin-top:16px">Search</p>
-    <div class="chips" role="group" aria-label="Default search">
-      ${[['duck', 'DuckDuckGo'], ['google', 'Google'], ['bing', 'Bing']].map(([k, w]) => `<button type="button" class="chip${(s.search || 'duck') === k ? ' on' : ''}" data-do="search" data-v="${k}" aria-pressed="${(s.search || 'duck') === k}">${w}</button>`).join('')}
-    </div>
-    <p class="note">A new tab opens this search page. DuckDuckGo does not keep a profile of what you look up. Google and Bing do.</p>`}
-    <button type="button" class="btn" data-do="save-co">Save</button>
-    <h2 class="sect">Companies</h2>
-    <p class="note">A tap opens that company. Initiate a new one and this page goes back to the first screen. Close this to go back.</p>
+    ${pane === 'companies' ? `<p class="note">A tap opens that company. Initiate a new one and this page goes back to the first screen. Close this to go back.</p>
     <div class="chips">
       ${readRoster().map((r) => `<button type="button" class="chip${r.id === activeCompanyId() ? ' on' : ''}" data-do="plug" data-v="${esc(r.id)}">${esc(r.name)}</button>`).join('')}
       <button type="button" class="chip" data-do="new-co">Initiate a new company</button>
     </div>
-    ${only ? '' : `<div class="chips" role="group" aria-label="Where this company is kept">
+    ${companyFields}
+    <div class="chips" role="group" aria-label="Where this company is kept">
       <button type="button" class="chip${store.where === 'cloud' ? '' : ' on'}" data-do="where" data-v="computer" aria-pressed="${store.where !== 'cloud'}">On this phone</button>
       <button type="button" class="chip${store.where === 'cloud' ? ' on' : ''}" data-do="where" data-v="cloud" aria-pressed="${store.where === 'cloud'}">In the cloud</button>
     </div>
-    <p class="k" style="margin-top:14px">Intelligence</p>
+    ${cloudAsk ? `<div class="card">
+      <p class="note">Locked on this phone first, then sent to <b>${esc(window.BOS_GATE?.user?.email || 'the Iron Roots account you signed in with')}</b>. The passphrase is not that account’s password, and it is not sent. A different email is not asked for.</p>
+      ${secretField('cloud-phrase', 'Passphrase, at least 8 characters', 'new-password')}
+      ${secretField('cloud-phrase2', 'The passphrase again', 'new-password')}
+      <button type="button" class="btn fill" data-do="cloud-go">Lock it and move it to the cloud</button>
+    </div>` : ''}
+    <button type="button" class="btn" data-do="save-co">Save</button>
+    <div class="btns">
+      <button type="button" class="btn" data-do="export">Download a backup</button>
+      <label class="btn" style="cursor:pointer">Bring in a backup<input type="file" id="co-backup" accept=".json,application/json" hidden /></label>
+    </div>
+    <p class="note">${store.where === 'cloud'
+      ? 'The cloud holds a locked copy under the account you signed in with. Nothing stored there can be read back as your books. On this phone stops sending. Forgetting the passphrase locks that copy for good.'
+      : 'Kept on this phone, in this browser. In the cloud locks the books here first, then sends only the locked copy to the account you signed in with.'}</p>` : ''}
+    ${pane === 'customize' ? `${themeChips(s.paper, s.line, esc)}
+    <p class="k" style="margin-top:16px">Search</p>
+    <div class="chips" role="group" aria-label="Default search">
+      ${[['duck', 'DuckDuckGo'], ['google', 'Google'], ['bing', 'Bing']].map(([k, w]) => `<button type="button" class="chip${(s.search || 'duck') === k ? ' on' : ''}" data-do="search" data-v="${k}" aria-pressed="${(s.search || 'duck') === k}">${w}</button>`).join('')}
+    </div>
+    <p class="note">A new tab opens this search page. DuckDuckGo does not keep a profile of what you look up. Google and Bing do.</p>
+    <button type="button" class="btn" data-do="save-co">Save</button>` : ''}
+    ${pane === 'account' ? `<p class="k">Intelligence</p>
     <div class="chips" role="group" aria-label="Intelligence">
       <button type="button" class="chip${store.settings.ai ? '' : ' on'}" data-do="ai" data-v="0" aria-pressed="${!store.settings.ai}">Off</button>
       <button type="button" class="chip${store.settings.ai ? ' on' : ''}" data-do="ai" data-v="1" aria-pressed="${!!store.settings.ai}">On, when it is connected</button>
@@ -288,21 +301,8 @@ export function renderSettings(el, desk, opts = {}) {
     <p class="note">${store.settings.ai
       ? 'Asked for, and not connected. A reply written in sentences is still not read. The day’s counts, the shelf, and mail filed by its address keep working without it.'
       : 'Off. The desk counts the day, files mail by the address it came to, and does the batch and shelf arithmetic itself. Reading a reply written in sentences waits until you connect it.'}</p>
-    ${cloudAsk ? `<div class="card">
-      <p class="note">Locked on this phone first, then sent to <b>${esc(window.BOS_GATE?.user?.email || 'the Iron Roots account you signed in with')}</b>. The passphrase is not that account’s password, and it is not sent. A different email is not asked for.</p>
-      ${secretField('cloud-phrase', 'Passphrase, at least 8 characters', 'new-password')}
-      ${secretField('cloud-phrase2', 'The passphrase again', 'new-password')}
-      <button type="button" class="btn fill" data-do="cloud-go">Lock it and move it to the cloud</button>
-    </div>` : ''}
-    <div class="btns">
-      <button type="button" class="btn" data-do="export">Download a backup</button>
-      <label class="btn" style="cursor:pointer">Bring in a backup<input type="file" id="co-backup" accept=".json,application/json" hidden /></label>
-    </div>
-    <p class="note">${store.where === 'cloud'
-      ? 'The cloud holds a locked copy under the account you signed in with. Nothing stored there can be read back as your books. On this phone stops sending. Forgetting the passphrase locks that copy for good.'
-      : 'Kept on this phone, in this browser. In the cloud locks the books here first, then sends only the locked copy to the account you signed in with.'}</p>
     <div class="btns"><button type="button" class="btn" data-do="sign-out">Sign out</button></div>
-    <p class="note">Signs this phone out of the Iron Roots account. The company stays where it was kept.</p>`}`;
+    <p class="note">Signs this phone out. The desk closes and the login comes back. The company stays where it was kept. A membership is asked again once a day, even if this stays open.</p>` : ''}`;
 
   el.onchange = async (e) => {
     const tg = e.target;
@@ -321,10 +321,17 @@ export function renderSettings(el, desk, opts = {}) {
     const d = b.dataset;
     switch (d.do) {
       case 'save-co': {
-        const company = el.querySelector('#co-name-in').value.trim();
+        const nameEl = el.querySelector('#co-name-in');
+        if (!nameEl) {
+          const search = el.querySelector('[data-do="search"].on')?.dataset.v || store.settings.search || 'duck';
+          try { localStorage.setItem('wc.search', search); } catch {}
+          desk.act(() => ({ act: store.conf({ search }, 'search') }));
+          return;
+        }
+        const company = nameEl.value.trim();
         const pct = el.querySelector('#co-tax').value.trim();
         const taxRate = pct === '' ? 0 : Number(pct.replace('%', '')) / 100;
-        const search = el.querySelector('[data-do="search"].on')?.dataset.v || 'duck';
+        const search = store.settings.search || 'duck';
         const state = el.querySelector('#co-state').value;
         const entity = el.querySelector('#co-entity').value;
         const formed = el.querySelector('#co-formed').value;
@@ -342,8 +349,9 @@ export function renderSettings(el, desk, opts = {}) {
       }
       case 'new-co': {
         blankCompany();
-        window.parent?.postMessage({ source: 'wc-desk', type: 'booting' }, location.origin);
-        location.reload();
+        try { window.parent?.postMessage({ source: 'wc-desk', type: 'first-screen' }, location.origin); } catch {}
+        try { window.parent?.postMessage({ source: 'wc-desk', type: 'booting' }, location.origin); } catch {}
+        location.replace(location.href.replace(/#.*$/, ''));
         return;
       }
       case 'search':
@@ -375,7 +383,7 @@ export function renderSettings(el, desk, opts = {}) {
         try { await window.BOS_GATE?.sb?.auth.signOut(); } catch {}
         try { window.BOS_GATE.user = null; window.BOS_TOKEN = null; } catch {}
         try { const prev = JSON.parse(localStorage.getItem('wc.shell') || '{}'); prev.account = ''; localStorage.setItem('wc.shell', JSON.stringify(prev)); } catch {}
-        location.reload();
+        try { window.parent?.postMessage({ source: 'wc-desk', type: 'sign-out' }, location.origin); } catch {}
         return;
       case 'logo-off': desk.act(() => ({ act: store.conf({ logo: '' }, 'took the logo off') })); return;
       case 'export': saveAs(`war-chief-backup-${todayIso()}.json`, JSON.stringify(store.exportAll(), null, 1)); return;
