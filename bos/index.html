@@ -1,0 +1,1406 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>document.documentElement.classList.add("wc-phone")</script>
+    <style>html.wc-phone .top{display:none !important} html.wc-phone{scroll-padding-top:12px}</style>
+    <script type="module" src="./phone.js"></script>
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>War Chief</title>
+    <!-- The War Chief desk (docs/specs/WAR-CHIEF-TERMINAL.md, the second ruling of 2026-10-03):
+         one line of stations in the order the work happens, dressed in the mill desk's look.
+         Paper and line colour come from the company's settings (modules/theme.mjs); the values
+         below are cream and copper, so the first paint is never unstyled. -->
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3eee4; --surface: #fffcf6; --elevated: #e9e1d2; --fg: #1c1916; --muted: #5e574c; --subtle: #8a8174;
+        --accent: #8c4a2f; --on-accent: #fffcf6; --red: #b8220e; --gold: #8b6914; --badge: #fffcf6;
+        --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", "Segoe UI Mono", Menlo, Consolas, monospace;
+        --r: 12px;
+      }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html { background: var(--bg); -webkit-text-size-adjust: 100%; scroll-padding-top: 140px; } /* a record scrolled to lands below the sticky header, not under it */
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+      a { color: var(--accent); }
+      [hidden] { display: none !important; }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+      .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+      /* ── the header: monogram, company, how it saves, the line of tabs ───────────────── */
+      .top { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--elevated);
+             padding-top: env(safe-area-inset-top); }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 12px 0 6px; }
+      .monogram { width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden;
+                  border: 2px solid var(--accent); border-radius: 10px; background: var(--surface); font-weight: 700; }
+      .monogram img { width: 100%; height: 100%; object-fit: contain; }
+      .brand .who { min-width: 0; flex: 1 1 auto; }
+      .brand .who b { display: block; font-size: 16px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .brand .who span { display: block; font: 12px/1.35 var(--mono); color: var(--muted); }
+      .hbtn { flex: 0 0 auto; min-width: 40px; height: 40px; padding: 0 10px; border: 2px solid var(--accent); border-radius: 10px;
+              background: var(--surface); color: var(--fg); font: 600 14px/1 var(--sans); cursor: pointer; }
+      .hbtn[disabled] { opacity: .45; cursor: default; }
+      .hbtn svg { display: block; margin: 0 auto; }
+      .hbtn.on { background: var(--accent); color: var(--on-accent); }
+      .tabs { display: flex; align-items: center; gap: 2px; padding: 2px 0 10px; }
+      .tabs .arrow { flex: 0 0 auto; width: 30px; height: 40px; border: 0; background: transparent; color: var(--fg);
+                     font: 400 26px/1 var(--sans); cursor: pointer; }
+      .tabs .arrow[disabled] { visibility: hidden; }
+      .tabs.fits .arrow { display: none; } /* every tab in view: no arrows taking room */
+      .strip { flex: 1 1 auto; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth;
+               scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+      .strip::-webkit-scrollbar { display: none; }
+      .tab { flex: 0 0 auto; scroll-snap-align: start; display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
+             padding: 0 11px; border: 0; border-radius: 999px; background: transparent; color: var(--muted);
+             font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; white-space: nowrap; }
+      .tab.on { background: var(--accent); color: var(--on-accent); }
+      .tab .n { min-width: 18px; padding: 2px 5px; border-radius: 999px; background: var(--surface); color: var(--fg);
+                font: 700 10px/1 var(--mono); letter-spacing: 0; text-align: center; border: 1px solid var(--accent); }
+      .tab.on .n { border-color: var(--on-accent); }
+      .tab-gap { flex: 0 0 auto; width: 1px; height: 22px; margin: 0 8px; background: var(--subtle); }
+      /* inside the program (html.in-program) the frame draws one bar of the stations across the whole
+         window and stays put whatever shows under it (warchief-desktop/shell), so this header steps
+         aside there and a record scrolled to needs no room left for it */
+      html.in-program .top { display: none; }
+      html.in-program { scroll-padding-top: 16px; }
+
+      /* ── the page ─────────────────────────────────────────────────────────────────────── */
+      main.page { padding-bottom: calc(120px + env(safe-area-inset-bottom)); touch-action: pan-y; }
+      /* a swipe across the page: the station on screen goes out one side and the next comes in from the
+         other; the same two states, with and without the transition, make both halves */
+      main.page.sliding { transition: transform .18s ease, opacity .18s ease; }
+      main.page.off-left { transform: translateX(-100%); opacity: 0; }
+      main.page.off-right { transform: translateX(100%); opacity: 0; }
+      @media (prefers-reduced-motion: reduce) { main.page.sliding { transition: none; } }
+      h1.title { font-size: 44px; line-height: 1.05; font-weight: 800; letter-spacing: -.02em; margin: 26px 0 8px; }
+      .lede { color: var(--muted); margin: 0 0 18px; max-width: 62ch; }
+      h2.sect { font-size: 20px; line-height: 1.25; font-weight: 700; margin: 30px 0 10px; }
+      h3.sub { font-size: 16px; font-weight: 700; margin: 18px 0 6px; }
+      .k { font: 600 11px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+      .f { display: block; width: 100%; min-height: 48px; padding: 11px 14px; border: 2px solid var(--accent);
+           border-radius: var(--r); background: var(--surface); color: var(--fg); font: 16px/1.3 var(--sans); }
+      textarea.f { min-height: 110px; resize: vertical; }
+      select.f { appearance: auto; }
+      .f::placeholder { color: var(--muted); opacity: 1; }
+      /* The eye sits in the password box, the same as on the signpost: flush to the right,
+         quiet until it is pointed at. One rule, every password. */
+      .pw { position: relative; display: block; margin-top: 8px; }
+      .pw > .f,
+      .pw > input { padding-right: 2.9rem; }
+      .pw > .eye {
+        position: absolute; top: 0; right: 2px; z-index: 1;
+        display: grid; place-items: center; width: 2.6rem; height: 100%;
+        margin: 0; padding: 0; border: 0; border-radius: 0; min-height: 0;
+        background: transparent; color: var(--muted); cursor: pointer; font: inherit;
+      }
+      .pw > .eye:hover,
+      .pw > .eye:focus-visible { color: var(--accent); }
+      .pw > .eye .eye-shut,
+      .pw > .eye.on .eye-open { display: none; }
+      .pw > .eye.on .eye-shut { display: block; }
+      .cell .pw { margin-top: 0; }
+      .f:focus-visible, .btn:focus-visible, .chip:focus-visible, .tab:focus-visible, .line:focus-visible, .hbtn:focus-visible {
+        outline: 3px solid var(--fg); outline-offset: 2px; }
+      label.lab { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
+      .row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; margin: 8px 0; }
+      .row.tight > .cell { flex: 1 1 0; min-width: 4.5rem; }
+      .row > .f { flex: 1 1 150px; width: auto; min-width: 0; }
+      .row > .f.s { flex: 0 1 120px; }
+      .row > .f.m { flex: 0 1 150px; }
+      .cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 8px 0; }
+      .cell > .cap { font-size: 12.5px; line-height: 1.2; color: var(--muted); }
+      .row > .cell { flex: 1 1 150px; margin: 0; }
+      .row > .cell.s { flex: 0 1 120px; }
+      .row > .cell.m { flex: 0 1 150px; }
+      .row:has(> .cell) { align-items: flex-end; }
+      .btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 48px; padding: 0 16px;
+             border: 2px solid var(--accent); border-radius: var(--r); background: transparent; color: var(--fg);
+             font: 600 15px/1.2 var(--sans); cursor: pointer; text-decoration: none; text-align: center; }
+      .btn.fill { background: var(--accent); color: var(--on-accent); }
+      .btn.inline { width: auto; flex: 0 0 auto; }
+      .btn[disabled] { opacity: .5; cursor: not-allowed; }
+      .btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+      .btns > .btn { flex: 1 1 140px; width: auto; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+      .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 13px; border: 2px solid var(--accent);
+              border-radius: 999px; background: var(--surface); color: var(--fg); font: 14px/1.2 var(--sans); text-decoration: none;
+              cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+      .chip.on { background: var(--accent); color: var(--on-accent); }
+      .chip.gone { border-style: dashed; color: var(--muted); cursor: default; }
+      .chip.sm { min-height: 30px; padding: 2px 10px; font-size: 13px; }
+      .chip .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+      /* a letter on Mail: its name opens it; in the program its switch, when it has one, makes it send
+         itself (on: the knob to the right on a filled track) */
+      .lt { display: inline-flex; align-items: stretch; max-width: 100%; border: 2px solid var(--accent); border-radius: 999px;
+            background: var(--surface); overflow: hidden; }
+      .lt > button { border: 0; background: transparent; color: var(--fg); font: 13px/1.2 var(--sans); cursor: pointer; }
+      .lt > button:focus-visible { outline: 3px solid var(--fg); outline-offset: -3px; }
+      .lt .nm { min-height: 30px; padding: 3px 11px; text-align: left; overflow-wrap: anywhere; }
+      .lt .nm small { display: block; color: var(--muted); font-size: 11.5px; }
+      .lt .nm.on { background: var(--accent); color: var(--on-accent); }
+      .lt .nm.on small { color: inherit; opacity: .85; }
+      .lt .sw { position: relative; flex: 0 0 42px; border-right: 2px solid var(--accent); }
+      .lt .sw::before { content: ''; position: absolute; left: 8px; top: 50%; width: 26px; height: 16px; margin-top: -8px; box-sizing: border-box;
+                        border: 2px solid var(--muted); border-radius: 999px; }
+      .lt .sw::after { content: ''; position: absolute; left: 12px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+                       background: var(--muted); transition: left .12s ease; }
+      .lt.on .sw::before { border-color: var(--accent); background: var(--accent); }
+      .lt.on .sw::after { left: 22px; background: var(--on-accent); }
+      @media (prefers-reduced-motion: reduce) { .lt .sw::after { transition: none; } }
+      .boxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+      .box { display: block; border: 2px solid var(--accent); border-radius: var(--r); background: var(--surface); padding: 10px 12px;
+             color: var(--fg); text-align: left; font: inherit; min-width: 0; }
+      button.box { cursor: pointer; }
+      button.box.on { box-shadow: inset 0 0 0 2px var(--accent); }
+      .box .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .box .sub { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+      .list { margin: 8px 0; border-top: 1px solid var(--elevated); }
+      .line { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--elevated);
+              background: transparent; color: inherit; font: inherit; text-align: left; }
+      button.line { cursor: pointer; }
+      .line .nm { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+      .line .nm small, .line .nm .note { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+      .line .amt { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; max-width: 55%; overflow-wrap: anywhere; }
+      .line .amt small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+      .line.focus { background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); padding-left: 13px; padding-right: 10px; }
+      .card.focus { box-shadow: inset 3px 0 0 var(--accent); }
+      .open { background: var(--surface); border: 2px solid var(--accent); border-radius: var(--r); padding: 12px 14px; margin: 6px 0 14px; }
+      .card { background: var(--surface); border: 2px solid var(--accent); border-radius: var(--r); padding: 12px 14px; margin: 10px 0; }
+      .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; background: var(--badge);
+               font: 700 11px/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; vertical-align: 1px; white-space: nowrap; }
+      .badge.red { color: var(--red); }
+      .badge.gold { color: var(--gold); }
+      .badge.plain { color: var(--fg); background: var(--surface); }
+      .note { color: var(--muted); font-size: 14px; }
+      .truth { color: var(--muted); font-size: 14px; border-left: 3px solid var(--subtle); padding: 2px 0 2px 10px; margin: 8px 0; }
+      .num { font-variant-numeric: tabular-nums; }
+      .drop { border: 2px dashed var(--subtle); border-radius: var(--r); padding: 20px 16px; text-align: center; color: var(--muted); margin: 12px 0; }
+      .drop.hot, body.dragging .drop { border-color: var(--accent); background: var(--surface); color: var(--fg); }
+      .drop input[type=file] { max-width: 100%; margin-top: 8px; color: var(--fg); }
+      /* while something is dragged over the desk: where it will go, out of the way of the drop */
+      #drop-hint { display: none; position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+                   z-index: 70; width: max-content; max-width: calc(100vw - 24px); padding: 10px 16px; border-radius: 14px;
+                   background: var(--fg); color: var(--bg); font: 600 14px/1.35 var(--sans); text-align: center; pointer-events: none; }
+      body.dragging #drop-hint { display: block; }
+      hr.rule { border: 0; border-top: 1px solid var(--elevated); margin: 26px 0; }
+      .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .warnbar { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--r); background: var(--badge); color: var(--gold);
+                 border: 1px solid var(--gold); font-size: 14px; }
+      .warnbar.red { color: var(--red); border-color: var(--red); }
+      .foot { margin: 40px 0 0; color: var(--muted); font-size: 13px; }
+      pre.letter { white-space: pre-wrap; font: 14px/1.5 var(--mono); margin: 0; }
+      table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+      table.tbl td { padding: 6px 0; border-bottom: 1px solid var(--elevated); vertical-align: top; overflow-wrap: anywhere; }
+      table.tbl td + td { padding-left: 10px; }
+      table.tbl td.r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      table.tbl td.r small { display: block; white-space: normal; font-weight: 400; color: var(--muted); font-size: 12px; }
+      table.tbl th { padding: 0 0 6px; border-bottom: 1px solid var(--elevated); text-align: left; color: var(--muted);
+                     font: 600 11px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+      table.tbl th + th { padding-left: 10px; }
+      table.tbl th.r { text-align: right; }
+
+      /* ── Inventory, nested (modules/inventory.mjs): a product holds its materials, a material the
+         places that sell it (Matt, 2026-10-05 20:46Z, "russian doll style"). The product's row and its
+         materials' rows share one set of columns, so what a batch uses stands in one column down the
+         whole doll: name · per batch · cost · on hand · open ─────────────────────────────────────── */
+      .dolls { margin: 18px 0 10px; }
+      .doll { border: 2px solid var(--accent); border-radius: var(--r); background: var(--bg); overflow: hidden; margin: 0 0 8px; }
+      .doll .dh, .doll .mr, .doll .cap { display: grid; grid-template-columns: minmax(0, 1fr) 150px 92px 92px 40px;
+        grid-template-areas: "n q c oh v"; align-items: center; column-gap: 4px; }
+      .doll .dh { min-height: 44px; padding-left: 12px; background: var(--accent); color: var(--on-accent); cursor: pointer; font: 500 14px/1.3 var(--sans); }
+      .doll.low > .dh { box-shadow: inset 0 -4px 0 var(--gold); }
+      .doll.out > .dh { box-shadow: inset 0 -4px 0 var(--red); }
+      .doll .n { grid-area: n; min-width: 0; overflow-wrap: anywhere; padding: 6px 0; }
+      .doll .q { grid-area: q; display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; }
+      .doll .c { grid-area: c; text-align: right; padding-right: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .doll .oh { grid-area: oh; text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+      .doll .v { grid-area: v; align-self: stretch; display: grid; place-items: center; min-height: 44px; border: 0; background: transparent;
+                 color: inherit; font: 400 20px/1 var(--sans); cursor: pointer; }
+      .doll .v svg { transition: transform .15s ease; }
+      .doll.on > .dh .v svg, .doll .mr.on .v svg { transform: rotate(180deg); }
+      /* what a batch uses, one line per kind of measure, the number over the rows' numbers and the
+         word over their units (his "the g per batch rides over vertical inline") */
+      .doll .dh .q { padding: 6px 0; }
+      .doll .q .tl { grid-column: 1 / -1; display: grid; grid-template-columns: 64px minmax(0, 1fr); font-variant-numeric: tabular-nums; }
+      .doll .q .tl b { font-weight: 500; text-align: right; padding-right: 9px; }
+      .doll .q .tl i, .doll .q i.u { font-style: normal; padding-left: 9px; }
+      .doll .dh > .oh { padding-right: 9px; }
+      .doll .dh > .oh:has(input) { padding-right: 0; }
+      .doll .cap { min-height: 30px; padding-left: 12px; color: var(--muted); font: 600 11px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      .doll .cap .q { display: block; padding-left: 9px; }
+      .doll .cap .oh { padding-right: 9px; }
+      .doll .mr { min-height: 44px; padding-left: 12px; border-top: 1px solid var(--elevated); font-size: 14px; cursor: pointer; }
+      .doll .mr.low { background: color-mix(in srgb, var(--gold) 26%, var(--bg)); color: var(--gold); }
+      .doll .mr.out { background: color-mix(in srgb, var(--red) 16%, var(--bg)); color: var(--red); }
+      .doll .mr.new { cursor: default; }
+      /* a field on a row reads as the row's own words until it is pointed at or typed in */
+      .doll .di { width: 100%; min-width: 0; height: 34px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px;
+                  background: transparent; color: inherit; font: inherit; font-variant-numeric: tabular-nums; }
+      .doll .di.num { text-align: right; }
+      .doll .di::placeholder { color: inherit; opacity: .55; }
+      .doll .di:hover { border-color: var(--subtle); }
+      .doll .di:focus { outline: none; border-color: var(--accent); background: var(--surface); color: var(--fg); }
+      .doll .di:focus-visible { outline: 3px solid var(--fg); outline-offset: 1px; }
+      .doll .dh .di:focus { color: var(--fg); }
+      .doll .uw { position: relative; display: inline-block; max-width: 100%; min-width: 0; }
+      .doll .uw::after { content: '▾'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; font-size: 12px; }
+      .doll select.di { appearance: none; padding-right: 20px; cursor: pointer; }
+      /* the unit hugs its word, so its arrow sits beside it (Safari, without field-sizing, sizes the list
+         to its widest unit, a few letters) */
+      .doll .q .uw { justify-self: start; }
+      .doll .uw select.di { width: auto; max-width: 100%; field-sizing: content; }
+      .doll .oh .di { text-align: right; }
+      .doll .n .di + .di { margin-top: 2px; }
+      .doll .wr .oh { color: var(--muted); font-weight: 400; padding-right: 9px; }
+      .doll .x { font-size: 22px; color: var(--muted); }
+      .doll .dh .x { color: var(--on-accent); }
+      /* a material opened: the places that sell it */
+      .doll .mp { margin: 0 8px 8px; padding: 12px; border-radius: 8px; background: var(--elevated); cursor: default; }
+      .mph { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; font: 500 14px/1.3 var(--sans); }
+      /* the Sources line folds the panel from anywhere on it, as the material's row opens it */
+      .doll .mp > .mph[data-do] { cursor: pointer; user-select: none; }
+      .doll .src { margin: 8px 0; padding: 12px; border-radius: 8px; background: var(--bg); }
+      .doll .opt { font: 12px/1.4 var(--mono); color: var(--subtle); margin-bottom: 4px; }
+      .doll .src.pin .opt { color: var(--gold); }
+      .doll .f { min-height: 44px; padding: 8px 12px; margin: 6px 0; font-size: 15px; }
+      .doll .trio { display: grid; grid-template-columns: minmax(0, 1fr) 84px 84px; gap: 6px; }
+      .doll .trio .f { margin: 0; }
+      .doll .calc { margin: 6px 0 2px; font: 12px/1.4 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+      .doll .srcb, .doll .frow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0 0; }
+      .doll .grow { flex: 1 1 auto; }
+      .doll .btn.sm { width: auto; min-height: 40px; padding: 0 14px; border-radius: 8px; font-size: 14px; flex: 0 0 auto; }
+      .doll .f.xs { width: 64px; flex: 0 0 auto; margin: 0; text-align: right; }
+      .doll .f.s { width: 124px; flex: 0 0 auto; margin: 0; }
+      .doll .f.d { width: 156px; flex: 0 0 auto; margin: 0; }
+      .doll .mk { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+      .doll .f.grow { width: auto; margin: 0; min-width: 120px; }
+      .lnk { min-height: 36px; padding: 0 8px; border: 0; background: transparent; color: var(--muted); font: 500 14px/1.2 var(--sans); cursor: pointer; }
+      .lnk:hover { color: var(--fg); text-decoration: underline; }
+      .lnk.wide { display: block; width: 100%; margin-top: 8px; }
+      .doll .al { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+      .doll .mset { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+      .doll .seg { display: inline-flex; gap: 4px; }
+      .doll .seg .chip { margin: 0; }
+      .doll .df { padding: 10px; border-top: 1px solid var(--elevated); }
+      .doll .df .two { display: flex; gap: 8px; }
+      .doll .df .two .btn { flex: 1 1 0; min-height: 44px; }
+      .doll .each { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+      .doll .dl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 40px; padding: 4px 2px; border-top: 1px solid var(--elevated); font-size: 14px; }
+      .doll .dl .grow { color: var(--muted); }
+      .doll.focus, .doll .focus { outline: 3px solid var(--gold); outline-offset: -3px; }
+      .doll .dh.new { cursor: default; }
+      .doll .dh .di::placeholder { color: var(--on-accent); }
+      .doll .truth { font-size: 13px; }
+      .dolls + .btns { margin-top: 4px; }
+      .dolls + .btns .btn.fill { flex: 2 1 200px; }
+      @media (max-width: 560px) {
+        /* two lines a row: the name, then per batch · cost · on hand under it, still one column each */
+        .doll .dh, .doll .mr, .doll .cap { grid-template-columns: minmax(0, 1fr) 76px 76px 40px; grid-template-areas: "n n n v" "q c oh v"; }
+        .doll .n { padding: 6px 0 0; }
+        .doll .trio { grid-template-columns: minmax(0, 1fr) 70px 76px; }
+        /* the product's name on a line of its own, how many a batch makes and its alert under it */
+        .doll .fset .f.grow { order: -1; flex-basis: 100%; }
+        .doll .fset .al { margin-left: auto; }
+        /* an order's line is three fields: on a phone each one takes the row, nothing sits off the edge */
+        #or-form .row { flex-direction: column; }
+        #or-form .row > .cell, #or-form .row > .cell.s { flex: 1 1 auto; width: 100%; }
+      }
+
+      /* ── Books (modules/books.mjs): four totals, income and expenses by month, the two pies with
+         their tables, the entries. Laid out after QuickBooks Online, FreshBooks and Zoho Books (the
+         module's head names what was read where); the colours are the desk's own lines ─────────── */
+      @media (min-width: 700px) { .boxes.kpi { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+      .key { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+      .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+      .key .sw { margin-right: 5px; vertical-align: -1px; }
+      .key .sw ~ .sw { margin-left: 14px; }
+      .sw.bi, .mo .bi { background: var(--accent); }
+      .sw.bo, .mo .bo { background: var(--muted); }
+      .months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px; margin: 0 0 6px; }
+      .mo { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 6px 1px 4px; border: 0; border-radius: 8px;
+            background: transparent; color: var(--muted); font: 600 11px/1.2 var(--mono); cursor: pointer; }
+      .mo:hover { background: var(--surface); }
+      .mo.on { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 2px var(--accent); }
+      .mo .bars { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 96px; border-bottom: 1px solid var(--subtle); }
+      .mo .bars i { display: block; width: min(12px, 40%); border-radius: 3px 3px 0 0; }
+      .mo .ml { text-align: center; text-transform: uppercase; letter-spacing: .04em; overflow: hidden; }
+      .pies { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; margin: 18px 0 12px; }
+      .pie { min-width: 0; padding: 12px 14px; border: 2px solid var(--accent); border-radius: var(--r); background: var(--surface); }
+      .pie h3.sub { margin: 0 0 6px; }
+      .donut { position: relative; width: 176px; max-width: 100%; margin: 4px auto 12px; }
+      .donut svg { display: block; width: 100%; height: auto; }
+      .donut path, .donut circle { fill: none; stroke-width: 6; }
+      .donut .hole { stroke: var(--elevated); }
+      .donut .sl { cursor: pointer; transition: opacity .15s ease; }
+      .donut .sl.dim { opacity: .3; }
+      .donut .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    text-align: center; pointer-events: none; }
+      .donut .mid b { font-size: 17px; font-variant-numeric: tabular-nums; }
+      .donut .mid small { color: var(--muted); font-size: 12px; }
+      .legend { border-top: 1px solid var(--elevated); }
+      .leg { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto 42px; align-items: center; gap: 8px; width: 100%; min-height: 40px;
+             padding: 6px 4px; border: 0; border-bottom: 1px solid var(--elevated); background: transparent; color: var(--fg);
+             font: 14px/1.3 var(--sans); text-align: left; cursor: pointer; }
+      .leg:hover { background: var(--bg); }
+      .leg.on { background: var(--bg); box-shadow: inset 3px 0 0 var(--accent); }
+      .leg .sw { width: 12px; height: 12px; }
+      .leg .ln { min-width: 0; overflow-wrap: anywhere; }
+      .leg .la { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .leg .lp { text-align: right; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+      .grp { display: flex; justify-content: space-between; gap: 10px; padding: 12px 2px 4px; border-bottom: 1px solid var(--elevated); }
+      .drop.focus { border-color: var(--accent); background: var(--surface); color: var(--fg); }
+      .ents { margin: 8px 0; border-top: 1px solid var(--elevated); }
+      .ehead, .line.ent { display: grid; grid-template-columns: 92px minmax(0, 1.6fr) minmax(0, 1fr) minmax(84px, auto); gap: 4px 12px; align-items: center; }
+      .ehead { padding: 8px 2px 6px; border-bottom: 1px solid var(--elevated); color: var(--muted); font: 600 11px/1.3 var(--mono);
+               letter-spacing: .1em; text-transform: uppercase; }
+      .ehead .r { text-align: right; }
+      .line.ent .dt { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .line.ent .ct { min-width: 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+      .line.ent .ct select.f { min-height: 36px; padding: 4px 8px; font-size: 14px; }
+      @media (min-width: 561px) { .line.ent .ct:not(:has(select)) { padding-left: 10px; } } /* the words start where a list's words do */
+      .line.ent .amt { max-width: none; }
+      @media (max-width: 560px) {
+        /* a row on two lines: what and how much, then where it was filed and the day */
+        .ehead { display: none; }
+        .line.ent { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nm amt" "ct dt"; }
+        .line.ent .nm { grid-area: nm; }
+        .line.ent .amt { grid-area: amt; }
+        .line.ent .ct { grid-area: ct; }
+        .line.ent .dt { grid-area: dt; text-align: right; }
+      }
+
+      /* ── first open: "Initiate your Company." ─────────────────────────────────────────── */
+      .setup { max-width: 440px; margin: 0 auto; padding: calc(9vh + env(safe-area-inset-top)) 16px 60px; }
+      .setup h1 { font-size: 52px; line-height: 1.04; font-weight: 800; letter-spacing: -.02em; margin: 0 0 22px; }
+      .paper-chip { border-color: var(--subtle); }
+      .paper-chip.on { box-shadow: 0 0 0 2px var(--fg); border-color: var(--fg); }
+      .line-chip.on { box-shadow: 0 0 0 2px var(--fg); }
+      .line-chip.on::after { content: '✓'; font-weight: 700; }
+
+      .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 0 6px; }
+      .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+      .cal-week span { text-align: center; font-size: 11px; letter-spacing: .04em; opacity: .7; }
+      .cal-day { min-height: 52px; border: 1px solid var(--elevated, #e9e1d2); border-radius: 8px; background: transparent; color: inherit; text-align: left; padding: 3px 4px; display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+      .cal-day.blank { border-color: transparent; }
+      .cal-day b { font-size: 13px; line-height: 1.1; }
+      .cal-day span, .cal-day small { font-size: 10px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .cal-day.today { box-shadow: inset 0 0 0 2px var(--accent, #8c4a2f); }
+      .cal-day.open { background: var(--accent, #8c4a2f); color: var(--on-accent, #fffcf6); }
+      .cal-day.filing:not(.open) b { color: var(--accent, #8c4a2f); }
+      .cal-day.late:not(.open) { box-shadow: inset 0 0 0 2px #b8220e; }
+      .cal-overlay { margin-top: 8px; }
+
+      /* ── the toast: what happened, Undo, the next step on the line ────────────────────── */
+      /* over an open card the toast stands above the card's foot, never over its buttons: --so-foot is
+         the foot's height, safe area and all (modules/slideover.mjs; Fable's pass on 0.6.0 found the
+         toast over Open in Inventory at the program's desk width) */
+      .toast { position: fixed; left: 50%; bottom: calc(16px + var(--so-foot, env(safe-area-inset-bottom))); transform: translate(-50%, calc(100% + 40px));
+               visibility: hidden; z-index: 60; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+               width: max-content; max-width: min(640px, calc(100vw - 24px));
+               padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--fg); color: var(--bg);
+               box-shadow: 0 10px 30px rgba(0, 0, 0, .25); transition: transform .18s ease, visibility 0s linear .18s; }
+      .toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform .18s ease; }
+      .toast .tmsg { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+      .toast .tbtn { flex: 0 0 auto; min-height: 36px; padding: 0 12px; border: 2px solid var(--bg); border-radius: 10px;
+                     background: transparent; color: var(--bg); font: 600 14px/32px var(--sans); text-decoration: none; cursor: pointer; }
+      .toast .tx { flex: 0 0 auto; width: 32px; height: 32px; border: 0; background: transparent; color: var(--bg); font-size: 20px; cursor: pointer; }
+      .toast.err .tmsg::before { content: '⚠ '; }
+      @media (max-width: 560px) {
+        .toast { flex-wrap: wrap; width: calc(100vw - 24px); }
+        .toast .tmsg { flex: 1 1 calc(100% - 52px); }
+        .toast .tx { order: 1; }
+        .toast .tbtn { order: 2; }
+      }
+
+      /* ── the sign-in, on the public address only ──────────────────────────────────────── */
+      #bos-gate { max-width: 430px; margin: 12vh auto; padding: 24px 22px; text-align: center; background: var(--surface);
+                  border: 2px solid var(--accent); border-radius: var(--r); }
+      #bos-gate h2 { font: 700 13px/1.3 var(--mono); letter-spacing: .14em; margin: 0 0 14px; }
+      #bos-gate input { display: block; width: 100%; margin: 6px 0; min-height: 46px; padding: 10px 12px; border-radius: 10px;
+                        border: 2px solid var(--accent); background: var(--surface); color: var(--fg); font: inherit; }
+      #bos-gate button { margin: 8px 4px 0; min-height: 44px; padding: 0 18px; border-radius: 10px; cursor: pointer;
+                         border: 2px solid var(--accent); background: transparent; color: var(--fg); font: 600 14px/1 var(--sans); }
+      #bos-gate .pw { margin: 6px 0; }
+      #bos-gate .pw > input { margin: 0; }
+      #bos-gate .pw > .eye { border: 0; background: transparent; color: var(--muted); }
+      #bos-gate .msg { font-size: 14px; margin-top: 10px; min-height: 18px; }
+      #bos-gate .why { font-size: 13px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+
+      @media (max-width: 480px) {
+        h1.title { font-size: 36px; margin-top: 20px; }
+        .setup h1 { font-size: 44px; }
+        .boxes, .two { gap: 6px; }
+      }
+    </style>
+    <!-- The sign-in gate needs Supabase on the public address. If it fails to load, the page
+         stays shut and the data stays shut with it; the server's lock does not depend on it. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+            onerror="window.BOS_CDN_FAILED = true"></script>
+  </head>
+  <body>
+    <!-- ── the sign-in: shown on the public address until access is decided ───────────────── -->
+    <div id="bos-gate" hidden>
+      <h2>WAR CHIEF</h2>
+      <div id="bos-login">
+        <input id="bos-email" type="email" placeholder="Email" autocomplete="username" />
+        <span class="pw"><input id="bos-pass" type="password" placeholder="Password" autocomplete="current-password" /><button type="button" class="eye" data-eye="bos-pass" aria-label="Show password" aria-pressed="false"><svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-shut" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.2A10.7 10.7 0 0 1 12 6c6.5 0 10 6 10 6a18 18 0 0 1-3.2 3.8"/><path d="M6.7 6.7C3.6 8.6 2 12 2 12s3.5 6 10 6c1.6 0 3-.3 4.2-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></span>
+        <div>
+          <button type="button" id="bos-signin">Open</button>
+          <button type="button" id="bos-magic">Email me a link</button>
+        </div>
+      </div>
+      <div id="bos-denied" hidden>
+        <p>War Chief is Gold. This Iron Roots account is not.</p>
+        <button type="button" id="bos-signout-2">Sign out</button>
+      </div>
+      <div class="msg" id="bos-msg"></div>
+      <div class="why">
+        This page reads real books, so it is closed by default. The numbers are refused at the
+        server, not just hidden here; signing in is what fetches them.
+      </div>
+    </div>
+
+    <div hidden id="bos-main">
+      <!-- first open: the company, its paper and its line colour -->
+      <section id="setup" class="setup" hidden></section>
+
+      <div id="desk" hidden>
+        <header class="top">
+          <div class="wrap">
+            <div class="brand">
+              <div class="monogram" id="monogram" aria-hidden="true"></div>
+              <div class="who"><b id="co-name"></b><span id="co-sub"></span><span id="co-acct" hidden></span></div>
+              <button type="button" class="hbtn" id="undo" disabled title="Take back the last thing done">Undo</button>
+              <button type="button" class="hbtn" id="palette-open" title="Find anything (/ or Ctrl+K)" aria-label="Find anything"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg></button>
+            </div>
+            <nav class="tabs" aria-label="Stations">
+              <button type="button" class="arrow" data-scroll="-1" aria-label="Earlier stations">‹</button>
+              <div class="strip" id="os-nav"></div>
+              <button type="button" class="arrow" data-scroll="1" aria-label="Later stations">›</button>
+            </nav>
+          </div>
+        </header>
+        <div class="wrap">
+          <div id="warn" hidden></div>
+          <main class="page" id="os-mount"></main>
+        </div>
+      </div>
+    </div>
+
+    <div id="slideover-root"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="drop-hint" aria-hidden="true">Let go: a label fills its order on Ship, a receipt fills Buy, money goes to Books, a file is read</div>
+
+    <script>
+      const BOS_GATE = {
+        allow: [],
+        url: 'https://oilygfntezdgbasylfaq.supabase.co',
+        key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pbHlnZm50ZXpkZ2Jhc3lsZmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MDQ5MzgsImV4cCI6MjA5MDE4MDkzOH0.BWX1HFVXI_UzdzKsOzm7vk5wk3ZknO-mDmYvhnuFCfM',
+        sb: null, user: null,
+      };
+      window.BOS_GATE = BOS_GATE;
+      window.BOS_TOKEN = null;
+
+      // The same Gold rule as ironroots.us: an owner, a paid Gold row, or the War Chief's
+      // free 30 days. Anything else is not let in. A failed read is a no.
+      const GOLD_OWNERS = ['mattvermeulen2@gmail.com', 'ironrootssupply@gmail.com', 'mitchvermeulen14@gmail.com'];
+      const GOLD_TRIAL_MS = 30 * 86400000;
+      window.BOS_IS_GOLD = async (session) => {
+        const email = String(session?.user?.email || '').toLowerCase();
+        if (GOLD_OWNERS.includes(email)) return true;
+        const id = session?.user?.id;
+        const token = session?.access_token;
+        if (!id || !token) return false;
+        try {
+          const r = await fetch(BOS_GATE.url + '/rest/v1/memberships?select=tier,paid_until,trial_started_at&user_id=eq.' + encodeURIComponent(id), {
+            cache: 'no-store',
+            headers: { apikey: BOS_GATE.key, authorization: 'Bearer ' + token, accept: 'application/json' },
+          });
+          if (!r.ok) return false;
+          const row = (await r.json())?.[0];
+          if (!row) return false;
+          const now = Date.now();
+          const paid = row.paid_until && Date.parse(row.paid_until) > now;
+          if (row.tier === 'gold' && paid) return true;
+          if (row.trial_started_at && now < Date.parse(row.trial_started_at) + GOLD_TRIAL_MS) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      };
+
+      document.addEventListener('click', (e) => {
+        const b = e.target.closest?.('[data-eye]');
+        if (!b) return;
+        const input = document.getElementById(b.getAttribute('data-eye'));
+        if (!input) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        b.classList.toggle('on', show);
+        b.setAttribute('aria-pressed', show ? 'true' : 'false');
+        b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      });
+
+      // A desk drawn inside the phone's frame has an empty address of its own. Ask the
+      // frame. localhost and the tailnet stay open, the same as the desktop copy.
+      const bosOpenContext = () => {
+        let h = location.hostname;
+        if (!h) { try { h = parent.location.hostname; } catch { h = ''; } }
+        return h === 'localhost' || h === '127.0.0.1' || h === '' || /^100\./.test(h);
+      };
+
+      window.BOS_READY = (async () => {
+        const gate = document.getElementById('bos-gate');
+        const main = document.getElementById('bos-main');
+        const login = document.getElementById('bos-login');
+        const denied = document.getElementById('bos-denied');
+        const msg = document.getElementById('bos-msg');
+        const show = (ok, isDenied) => {
+          gate.hidden = ok; main.hidden = !ok;
+          if (!ok) { login.hidden = !!isDenied; denied.hidden = !isDenied; }
+        };
+
+        if (bosOpenContext()) { show(true); return; }
+
+        if (!(window.supabase && window.supabase.createClient)) {
+          show(false);
+          /* Name WHICH thing failed. Failing closed is right; failing closed silently is
+             indistinguishable from a broken page, and it leaves the person on the other
+             end guessing at causes — Matt's first theory was that public JavaScript was
+             the problem, which it never is. A gate that cannot say why it is shut turns
+             its owner into a debugger. */
+          msg.textContent = window.BOS_CDN_FAILED
+            ? 'The sign-in library could not be downloaded — the CDN is unreachable or blocked. The page stays closed on purpose; reload when you have a connection.'
+            : 'The sign-in library loaded but did not start \u2014 the error to quote is "supabase loaded, createClient missing".';
+          return new Promise(() => {}); // never boots: fail closed
+        }
+        BOS_GATE.sb = window.supabase.createClient(BOS_GATE.url, BOS_GATE.key);
+
+        const settle = async () => {
+          let session = null;
+          try { session = (await BOS_GATE.sb.auth.getSession()).data.session; } catch (e) {}
+          BOS_GATE.user = session ? session.user : null;
+          const ok = !!session && await window.BOS_IS_GOLD(session);
+          window.BOS_TOKEN = ok ? session.access_token : null;
+          show(ok, !!BOS_GATE.user && !ok);
+          return ok;
+        };
+
+        document.getElementById('bos-signin').onclick = async () => {
+          const email = (document.getElementById('bos-email').value || '').trim();
+          const password = document.getElementById('bos-pass').value || '';
+          if (!email || !password) { msg.textContent = 'Email and password, or use the link.'; return; }
+          msg.textContent = 'Opening…';
+          const { error } = await BOS_GATE.sb.auth.signInWithPassword({ email, password });
+          msg.textContent = error ? error.message : '';
+        };
+        document.getElementById('bos-magic').onclick = async () => {
+          const email = (document.getElementById('bos-email').value || '').trim();
+          if (!email) { msg.textContent = 'Type your email first.'; return; }
+          const { error } = await BOS_GATE.sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href } });
+          msg.textContent = error ? error.message : 'Sent — check ' + email + ' for a one-time link.';
+        };
+        document.getElementById('bos-signout-2').onclick = async () => {
+          try { await BOS_GATE.sb.auth.signOut(); } catch (e) {}
+          location.reload();
+        };
+
+        if (await settle()) return;
+        // Not in yet. Resolve only when a sign-in lands, so boot happens once.
+        return new Promise((resolve) => {
+          BOS_GATE.sb.auth.onAuthStateChange(async () => { if (await settle()) resolve(); });
+        });
+      })();
+    </script>
+
+    <script type="module">
+      // The desk's boot: one store, one line of stations, one router, one write path.
+      //
+      // The line is the order the work happens (docs/specs/WAR-CHIEF-TERMINAL.md, the second
+      // ruling): INVENTORY, SHELF, ORDERS, SHIP, MAIL, BOOKS, then the three that serve every step,
+      // PEOPLE, CALENDAR and MARKETING (Matt, 2026-10-04 01:53Z). Inventory is Source, Stock and
+      // Make in one product-first station (Matt, 2026-10-04 18:42Z and 18:58Z: "source and stock
+      // should be one page … I want it to start with product"; "make … should be a button on
+      // inventory page"). There is no home screen. Every tap that changes the books
+      // goes through store.write() as one act, so the toast after it can always offer Undo and
+      // the next step on the line. Deep links: #station or #station/type:id.
+      import { loadStore, touchCloud } from './modules/store.mjs';
+      import { salesTaxOf, salesTaxWords } from './modules/compliance.mjs';
+      import { agendaOf } from './modules/calendar.mjs';
+      import * as V from './modules/verbs.mjs';
+      import { themeVars } from './modules/theme.mjs';
+      import { openPalette } from './modules/palette.mjs';
+      import { openSlideOver } from './modules/slideover.mjs';
+      import { toast, readText, themeChips, todayIso, secretField } from './modules/ui.mjs';
+      import { readFile, readDropped } from './modules/files.mjs';
+      import { station as inventory } from './modules/inventory.mjs';
+      import { station as orders } from './modules/orders.mjs';
+      import { station as ship } from './modules/ship.mjs';
+      import { station as mail, loadMailer, sendOwed } from './modules/mail.mjs';
+      import { station as books, renderSettings } from './modules/books.mjs';
+      import { station as people } from './modules/people.mjs';
+      import { station as calendar } from './modules/calendar.mjs';
+      import { station as marketing, website } from './modules/marketing.mjs';
+      import * as site from './modules/site.mjs';
+
+      const LINE = [inventory, orders, ship, mail, books];
+      const SIDE = [people, calendar, website, marketing];
+      // the doors of the desk before 2026-10-03, and the three stations Inventory took in on
+      // 2026-10-04, so an old bookmark or the program's kept tabs still land somewhere true
+      const OLD = { sourcing: 'inventory', source: 'inventory', stock: 'inventory', make: 'inventory', making: 'inventory',
+                    shelf: 'inventory', selling: 'orders', treasury: 'books', inbox: 'books', crew: 'people', home: null, dashboard: null };
+      const $ = (id) => document.getElementById(id);
+      const remembered = () => { try { return localStorage.getItem('os.station'); } catch { return null; } };
+      const remember = (id) => { try { localStorage.setItem('os.station', id); } catch {} };
+      const capital = (s) => String(s ?? '').charAt(0).toUpperCase() + String(s ?? '').slice(1);
+
+      function applyTheme(paper, line) {
+        const vars = themeVars(paper, line);
+        const root = document.documentElement.style;
+        for (const [k, v] of Object.entries(vars)) if (k !== '--scheme') root.setProperty(k, v);
+        root.colorScheme = vars['--scheme'];
+        document.documentElement.dataset.scheme = vars['--scheme'];
+        let meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) { meta = document.createElement('meta'); meta.name = 'theme-color'; document.head.appendChild(meta); }
+        meta.content = vars['--bg'];
+      }
+
+      const boot = async () => {
+        const store = await loadStore();
+        const actionItems = () => {
+          if (!store.settings.company) return [];
+          const out = [];
+          const open = (store.data.orders?.orders ?? []).filter((o) => ['new', 'paid'].includes(V.statusOf(o)));
+          if (open.length) out.push({ station: 'orders', label: open.length === 1 ? '1 open order' : open.length + ' open orders' });
+          const pay = site.waiting();
+          if (pay.length) out.push({ station: 'orders', label: pay.length === 1 ? 'A payment needs a pick' : pay.length + ' payments need a pick' });
+          let low = 0;
+          for (const p of store.data.products?.products ?? []) {
+            if (!p.itemId) continue;
+            const have = store.stockOf(p.itemId);
+            const units = Number(p.units) || 1;
+            const item = store.resolve('item:' + p.itemId);
+            if (have < units - 1e-9 || (item && Number(item.reorderAt) > 0 && have <= Number(item.reorderAt) && units === 1)) low++;
+          }
+          if (low) out.push({ station: 'inventory', label: low === 1 ? '1 thing is low on the shelf' : low + ' things are low on the shelf' });
+          try {
+            const late = agendaOf(store).overdue.filter((ev) => ev.kind === 'compliance' && ev.done !== true);
+            if (late.length) out.push({ station: 'calendar', label: late.length === 1 ? late[0].title : late.length + ' filings are late' });
+          } catch { /* a date the desk cannot read is not an action */ }
+          return out;
+        };
+        window.wcNeeds = actionItems;
+        await touchCloud();
+        // The program waits on this before the company goes (a switch, a sign-out, a close: main.js
+        // deskFlush): '' once every save so far has landed, else what did not save.
+        window.deskFlush = () => store.flush().then(() => store.saveNote || '');
+        // Where the program keeps this company and whether Iron Roots keeps companies in the cloud yet
+        // (main.js accountState: saves, cloud), asked before the first draw so the desk says it from
+        // the start. A program from before companies says neither, and keeps everything on the computer.
+        let acct0 = null;
+        if (store.mode === 'program') try { const r = await fetch('/_/account', { cache: 'no-store' }); acct0 = r.ok ? await r.json() : null; } catch {}
+        let savesTo = acct0?.saves === 'cloud' ? 'cloud' : 'computer';
+        let offerCloud = acct0?.cloud === true;
+        // The owner's mill shows only where its module loads: the owner's own site. A stranger's
+        // desk and the program never carry it, so its door simply never appears there.
+        let extras = [];
+        try {
+          const m = await import('./modules/mill.mjs');
+          if (m?.module?.id) extras = [m.module];
+        } catch { extras = []; }
+        let hasPlan = false;
+        const all = [...LINE, ...SIDE, ...extras];
+        let current = null;
+
+        const modeLine = () => store.where === 'cloud' ? 'Saved in the cloud'
+          : store.mode === 'program' ? (savesTo === 'cloud' ? 'Saved in the cloud' : 'Saved on this computer')
+          : store.mode === 'browser' ? 'Your changes are kept in this browser only' : 'Not saved anywhere';
+
+        // ── inside the program: the frame's bar of stations ──────────────────────────────
+        // The program hides this header (html.in-program) and draws one bar across the whole
+        // window, which stays put whatever shows under it (warchief-desktop/shell; Matt,
+        // 2026-10-04 20:47Z). The desk tells it what to show whenever that changes: the company
+        // and its logo, how the desk saves, where the account stands, the stations with their
+        // badges and the one on screen, and whether Undo has anything to take back; the colours go
+        // along so the bar wears the desk's own. The frame sends back what was pressed through
+        // window.deskCmd below. On the site there is no program to tell, and nothing is sent.
+        document.documentElement.classList.toggle('in-program', store.mode === 'program');
+        let acctText = '';
+        let toldBar = '';
+        const badgeOf = (s) => { try { return typeof s.badge === 'function' ? Number(s.badge(store)) || 0 : 0; } catch { return 0; } };
+        // The sites a station opens, which the program draws as chips at the foot of its left bar (Matt,
+        // 2026-10-05 22:26Z): the station's presets (`web.presets`), then the person's own, kept in the
+        // settings under the station's `web.keys`, one address each.
+        const sitesOf = (st) => {
+          const out = st.web.presets.map((p) => ({ name: p.name, url: p.url }));
+          for (const k of st.web.keys) for (const c of store.settings[k] ?? []) {
+            if (c?.name && /^https:\/\//i.test(c.url ?? '') && !out.some((o) => o.url === c.url)) out.push({ name: String(c.name), url: String(c.url), custom: true });
+          }
+          return out;
+        };
+        const tellProgram = () => {
+          if (store.mode !== 'program') return;
+          const css = getComputedStyle(document.documentElement);
+          const colors = {};
+          for (const k of ['bg', 'surface', 'elevated', 'fg', 'muted', 'subtle', 'accent', 'onAccent', 'gold', 'badge']) {
+            colors[k] = css.getPropertyValue('--' + k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())).trim();
+          }
+          const s = store.settings;
+          const json = JSON.stringify({
+            company: s.company || 'Your company', logo: /^data:image\/(png|jpeg|webp);base64,/.test(s.logo || '') ? s.logo : '',
+            saved: store.saveNote || modeLine(), unsaved: !!store.saveNote, acct: acctText, colors,
+            current: current?.id ?? '', canUndo: store.canUndo(), undoLabel: store.canUndo() ? store.lastLabel() : '',
+            stations: all.map((st) => ({ id: st.id, title: st.title, badge: badgeOf(st), group: LINE.includes(st) ? 'line' : SIDE.includes(st) ? 'side' : 'extra' })),
+            sites: Object.fromEntries(all.filter((st) => st.web).map((st) => [st.id, sitesOf(st)])),
+          });
+          if (json === toldBar) return;
+          toldBar = json;
+          fetch('/_/nav', { method: 'POST', headers: { 'content-type': 'application/json' }, body: json }).catch(() => {});
+        };
+
+        const paintHeader = () => {
+          const s = store.settings;
+          applyTheme(s.paper, s.line);
+          const kind = { sole: 'Sole prop', llc: 'LLC', partnership: 'Partnership', s: 'S corp', c: 'C corp', nonprofit: 'Nonprofit' }[s.entity] || '';
+          $('co-name').textContent = (s.company || 'Your company') + (kind ? ' (' + kind + ')' : '');
+          document.title = (s.company ? s.company + ' · ' : '') + 'War Chief';
+          const mono = $('monogram');
+          if (/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,/.test(s.logo || '')) {
+            mono.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = s.logo;
+            img.alt = '';
+            mono.appendChild(img);
+          } else mono.textContent = (s.company || 'W').trim().charAt(0).toUpperCase();
+          const sub = $('co-sub');
+          sub.textContent = store.saveNote || modeLine();
+          sub.style.color = store.saveNote ? 'var(--red)' : '';
+          sub.style.background = store.saveNote ? 'var(--badge)' : '';
+          const u = $('undo');
+          u.disabled = !store.canUndo();
+          u.title = store.canUndo() ? 'Take back: ' + store.lastLabel() : 'Nothing to take back yet';
+          tellProgram();
+        };
+        store.onSave = paintHeader; // widened further down, once the desk exists, to send the website's counts too
+
+        const paintWarn = () => {
+          const msgs = [...(store.dataWarnings ?? [])];
+          if (window.BOS_DATA_401) msgs.unshift('The server refused this desk’s data (401): you are signed in, but the lock did not accept the sign-in. Sign out and in again; the error to quote is "bos data 401".');
+          const w = $('warn');
+          w.hidden = !msgs.length;
+          w.className = 'warnbar';
+          w.textContent = msgs.join(' · ');
+        };
+
+        // ── tabs ──────────────────────────────────────────────────────────────────────────
+        const nav = $('os-nav');
+        const tab = (s) => {
+          const n = badgeOf(s);
+          const on = current && current.id === s.id;
+          return `<a class="tab${on ? ' on' : ''}" href="#${s.id}" data-tab="${s.id}"${on ? ' aria-current="page"' : ''}>${store.esc(s.title)}${n ? `<span class="n">${n}</span>` : ''}</a>`;
+        };
+        const paintTabs = () => {
+          nav.innerHTML = LINE.map(tab).join('') + '<span class="tab-gap" aria-hidden="true"></span>'
+            + SIDE.map(tab).join('') + (extras.length ? '<span class="tab-gap" aria-hidden="true"></span>' + extras.map(tab).join('') : '');
+          fit();
+          const on = nav.querySelector('.tab.on');
+          if (on) {
+            const a = on.getBoundingClientRect();
+            const b = nav.getBoundingClientRect();
+            if (a.left < b.left || a.right > b.right) nav.scrollTo({ left: nav.scrollLeft + (a.left - b.left) - (b.width - a.width) / 2, behavior: 'instant' });
+          }
+          arrows();
+          tellProgram();
+        };
+        // the arrows give their room back when every tab is in view; measured here and on a resize,
+        // never while scrolling (a strip changing width under the finger would jump)
+        const fit = () => {
+          const bar = nav.parentElement;
+          bar.classList.add('fits');
+          bar.classList.toggle('fits', nav.scrollWidth - nav.clientWidth <= 1);
+        };
+        const arrows = () => {
+          const room = nav.scrollWidth - nav.clientWidth;
+          document.querySelector('[data-scroll="-1"]').disabled = !(room > 1 && nav.scrollLeft > 2);
+          document.querySelector('[data-scroll="1"]').disabled = !(room > 1 && nav.scrollLeft < room - 2);
+        };
+        nav.addEventListener('scroll', arrows, { passive: true });
+        addEventListener('resize', () => { fit(); arrows(); }, { passive: true });
+        document.querySelectorAll('[data-scroll]').forEach((b) => b.addEventListener('click', () => {
+          nav.scrollBy({ left: Number(b.dataset.scroll) * nav.clientWidth * 0.6, behavior: 'smooth' });
+        }));
+
+        // ── the one way a tap changes the books ──────────────────────────────────────────
+        const doUndo = () => {
+          let label = null;
+          try { label = store.undo(); } catch (e) { toast(e?.message ?? String(e), { error: true }); return; }
+          rerender();
+          toast(label ? 'Took back: ' + label : 'Nothing to take back');
+        };
+        const desk = {
+          store,
+          fresh: false, // true only while a station draws for a new address, so a link can prefill a form once
+          get program() { return store.mode === 'program'; },
+          get savesTo() { return savesTo; }, // 'computer' or 'cloud' (in a browser: 'computer', unread)
+          get offersCloud() { return offerCloud; }, // Iron Roots keeps companies in the cloud now (a program from before companies: never)
+          go(hash) { if (location.hash === hash) route(); else location.hash = hash; },
+          // a station re-draws for a change of view (a chip, a section opened): what was typed stays
+          rerender: () => rerender(true),
+          toast,
+          // run a verb; on success re-draw and say what happened with Undo and the next step,
+          // on refusal say why and change nothing. `next` may be a function of the verb's result
+          // (the order just taken, whether the goods arrived), so the next step names the right thing.
+          // `keep` is for an act that does not use up the form around it (a colour tapped while a
+          // name is half typed): the typing survives the re-draw. `quiet` is a number typed where it
+          // shows (Inventory's rows): the page changing is the answer, so no toast; refused, the field
+          // goes back to what the books hold, and the toast says why.
+          act(fn, { next, say, keep = false, quiet = false } = {}) {
+            let r;
+            try { r = fn(); } catch (e) { toast(e?.message ?? String(e), { error: true }); if (quiet) rerender(false); return null; }
+            rerender(keep);
+            if (quiet) return r;
+            const label = say ?? r?.act?.label;
+            let nx = next;
+            try { nx = typeof next === 'function' ? next(r) : next; } catch { nx = null; }
+            if (r?.act && label) toast(capital(label) + (r?.warning ? '. ' + r.warning : ''), { undo: doUndo, next: nx || undefined });
+            else if (say) toast(say, { next: nx || undefined });
+            return r;
+          },
+        };
+
+        // ── the person's own website, in the program only (modules/site.mjs) ──────────────
+        // After each save the counts their page shows follow the Shelf (site.publish sends only a
+        // change); the payments PayPal confirmed arrive from the program (warchief-desktop/main.js,
+        // pollInbox), each booked in one act and marked taken only once the books are saved here.
+        // The letters the boxes on Mail owe go out after a save too (mail.mjs, sendOwed).
+        store.onSave = () => { paintHeader(); site.publish(desk); sendOwed(desk); };
+        window.deskInbox = (items) => site.take(desk, items);
+
+        // ── first open ───────────────────────────────────────────────────────────────────
+        // In the program the page first says where this company is kept, with the other place to keep
+        // it instead (Matt, 2026-10-06 08:45Z: "their option to save their business personal data
+        // available on either maybe option upon initiating company"). "Instead" asks the program for a
+        // new company kept there (main.js /_/companies), which comes in at once on this same page;
+        // this one, never named, holds nothing and is not listed. The cloud is offered only once Iron
+        // Roots keeps companies there (account state 'cloud').
+        const setupEl = $('setup');
+        let pick = { paper: store.settings.paper, line: store.settings.line, search: 'duck', entity: store.settings.entity || '', state: store.settings.state || '', formed: store.settings.formed || '', taxExempt: store.settings.taxExempt === true, where: 'computer' };
+        try { const kept = localStorage.getItem('wc.search'); if (kept === 'google' || kept === 'bing' || kept === 'duck') pick.search = kept; } catch {}
+        try { if (localStorage.getItem('wc.where') === 'cloud') pick.where = 'cloud'; } catch {}
+        // What was typed has to survive a chip. The page is drawn again for the paper, the
+        // line, the kind, the search and where it is kept, and a new drawing is empty.
+        let held = { name: store.settings.company || '', phrase: '', phrase2: '' };
+        const renderSetup = () => {
+          const take = (id, prev) => {
+            const el = setupEl.querySelector('#' + id);
+            return el ? el.value : prev;
+          };
+          held = {
+            name: take('su-name', held.name),
+            phrase: take('su-phrase', held.phrase),
+            phrase2: take('su-phrase2', held.phrase2),
+          };
+          const focusId = setupEl.contains(document.activeElement) ? document.activeElement.id : '';
+          let caret = null;
+          try {
+            const a = document.activeElement;
+            if (focusId && typeof a.selectionStart === 'number') caret = [a.selectionStart, a.selectionEnd];
+          } catch { caret = null; }
+          applyTheme(pick.paper, pick.line);
+          const searchChip = (id, label) => `<button type="button" class="chip${pick.search === id ? ' on' : ''}" data-search="${id}" aria-pressed="${pick.search === id}">${label}</button>`;
+          const kinds = [['sole', 'Sole prop'], ['llc', 'LLC'], ['partnership', 'Partnership'], ['s', 'S corp'], ['c', 'C corp'], ['nonprofit', 'Nonprofit']];
+          const states = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const cloud = pick.where === 'cloud';
+          const who = String(window.BOS_GATE?.user?.email || '');
+          setupEl.innerHTML = `
+            <h1>Initiate your<br>Company.</h1>
+            <input class="f" id="su-name" placeholder="Company Name" maxlength="120" autocomplete="organization" style="margin-top:18px" />
+            <p class="k" style="margin-top:18px">Where it is kept</p>
+            <div class="chips" role="group" aria-label="Where this company is kept">
+              <button type="button" class="chip${!cloud ? ' on' : ''}" data-keep="computer" aria-pressed="${!cloud}">On this phone</button>
+              <button type="button" class="chip${cloud ? ' on' : ''}" data-keep="cloud" aria-pressed="${cloud}">In the cloud</button>
+            </div>
+            <p class="note">${cloud ? 'Locked on this phone first, then sent to the Iron Roots account already signed in. The passphrase is not that account’s password, and it is not sent.' : 'Kept on this phone. Nothing is sent.'}</p>
+            ${cloud ? `<p class="note">Kept under <b>${store.esc(who || 'the account you signed in with')}</b>. There is no box for a different email.</p>
+              ${who ? '' : '<p class="warnbar">Sign in with your Iron Roots account first.</p>'}
+              ${secretField('su-phrase', 'Passphrase, at least 8 characters', 'new-password')}
+              ${secretField('su-phrase2', 'The passphrase again', 'new-password')}` : ''}
+            <div class="chips" role="group" aria-label="Kind of company" style="margin-top:10px">${kinds.map(([k, w]) => `<button type="button" class="chip${pick.entity === k ? ' on' : ''}" data-entity="${k}">${w}</button>`).join('')}</div>
+            <div class="row" style="margin-top:8px">
+              <label class="cell"><span class="cap">State</span><select class="f" id="su-state"><option value="">State</option>${states.map((c) => `<option value="${c}"${pick.state === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+              <label class="cell m"><span class="cap">Formed</span><select class="f" id="su-formed"><option value="">Month</option>${months.map((n, i) => { const v = String(i + 1).padStart(2, '0'); return `<option value="${v}"${pick.formed === v ? ' selected' : ''}>${n}</option>`; }).join('')}</select></label>
+            </div>
+            <label class="chip" style="cursor:pointer"><input type="checkbox" id="su-exempt" ${pick.taxExempt ? 'checked' : ''} /> Tax exempt</label>
+            <p class="note" id="su-tax">${store.esc(salesTaxWords(pick.state, pick.taxExempt))}</p>
+            <p class="note">The kind and the state put the renewal and the tax days on the calendar. Tax exempt leaves the renewal and drops the state tax.</p>
+            ${themeChips(pick.paper, pick.line, store.esc)}
+            <p class="k" style="margin-top:18px">Search</p>
+            <div class="chips" role="group" aria-label="Default search">${searchChip('duck', 'DuckDuckGo')}${searchChip('google', 'Google')}${searchChip('bing', 'Bing')}</div>
+            <p class="note">DuckDuckGo does not keep a profile of what you look up. Google and Bing do. The words you search are not sent to War Chief.</p>
+            <button type="button" class="btn fill" id="su-go" style="margin-top:22px">Initiate</button>
+            <p class="note" style="margin-top:14px">Initiate stores this business. The name and the colours can change later in Settings.</p>`;
+          setupEl.querySelectorAll('[data-keep]').forEach((b) => b.addEventListener('click', () => { pick.where = b.dataset.keep; renderSetup(); }));
+          const input = setupEl.querySelector('#su-name');
+          input.addEventListener('input', () => { setupEl.querySelector('#su-go').disabled = !input.value.trim(); });
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.value.trim()) setupEl.querySelector('#su-go').click(); });
+          setupEl.querySelectorAll('[data-paper]').forEach((b) => b.addEventListener('click', () => { pick.paper = b.dataset.paper; renderSetup(); }));
+          setupEl.querySelectorAll('[data-line]').forEach((b) => b.addEventListener('click', () => { pick.line = b.dataset.line; renderSetup(); }));
+          setupEl.querySelectorAll('[data-search]').forEach((b) => b.addEventListener('click', () => { pick.search = b.dataset.search; try { localStorage.setItem('wc.search', pick.search); } catch {} renderSetup(); }));
+          setupEl.querySelectorAll('[data-entity]').forEach((b) => b.addEventListener('click', () => { pick.entity = b.dataset.entity; renderSetup(); }));
+          const taxNote = () => { const n = setupEl.querySelector('#su-tax'); if (n) n.textContent = salesTaxWords(pick.state, pick.taxExempt); };
+          setupEl.querySelector('#su-state').addEventListener('change', (e) => { pick.state = e.target.value; taxNote(); });
+          setupEl.querySelector('#su-formed').addEventListener('change', (e) => { pick.formed = e.target.value; });
+          setupEl.querySelector('#su-exempt').addEventListener('change', (e) => { pick.taxExempt = e.target.checked; taxNote(); });
+          const nameEl = setupEl.querySelector('#su-name');
+          nameEl.value = held.name;
+          setupEl.querySelector('#su-go').disabled = !held.name.trim();
+          const phraseEl = setupEl.querySelector('#su-phrase');
+          const phrase2El = setupEl.querySelector('#su-phrase2');
+          if (phraseEl) phraseEl.value = held.phrase;
+          if (phrase2El) phrase2El.value = held.phrase2;
+          if (focusId === 'su-name' || focusId === 'su-phrase' || focusId === 'su-phrase2') {
+            const back = setupEl.querySelector('#' + focusId);
+            if (back) {
+              back.focus();
+              try { if (caret) back.setSelectionRange(caret[0], caret[1]); } catch { /* a button took the place */ }
+            }
+          }
+          setupEl.querySelector('#su-go').addEventListener('click', async () => {
+            const company = input.value.trim();
+            if (!company) return;
+            const go = setupEl.querySelector('#su-go');
+            if (pick.where === 'cloud') {
+              const phrase = setupEl.querySelector('#su-phrase')?.value || '';
+              const again = setupEl.querySelector('#su-phrase2')?.value || '';
+              if (!window.BOS_GATE?.user) { toast('Sign in with your Iron Roots account first. The books go to that account and no other.', { error: true }); return; }
+              if (phrase.length < 8) { toast('Use a passphrase of at least 8 characters.', { error: true }); return; }
+              if (phrase !== again) { toast('Type the passphrase the same way twice', { error: true }); return; }
+            }
+            go.disabled = true;
+            try { store.conf({ company, paper: pick.paper, line: pick.line, search: pick.search, entity: pick.entity, state: pick.state, formed: pick.formed, taxExempt: pick.taxExempt, taxRate: pick.taxExempt ? 0 : salesTaxOf(pick.state) }, 'initiated ' + company); }
+            catch (e) { toast(e.message, { error: true }); go.disabled = false; return; }
+            try { localStorage.setItem('wc.where', pick.where === 'cloud' ? 'cloud' : 'computer'); } catch {}
+            if (pick.where === 'cloud') {
+              try {
+                await store.moveToCloud({
+                  phrase: setupEl.querySelector('#su-phrase')?.value || '',
+                });
+              } catch (e) {
+                toast(e?.message || 'The cloud did not take it. It is kept on this phone.', { error: true });
+                store.keepLocal();
+              }
+            } else store.keepLocal();
+            route();
+          });
+        };
+
+        // ── the router ───────────────────────────────────────────────────────────────────
+        const mount = $('os-mount');
+        const parse = () => {
+          const parts = location.hash.replace(/^#/, '').split('/').filter(Boolean);
+          let id = parts.shift() ?? null;
+          if (id && id in OLD) id = OLD[id];
+          let ref = parts.length ? decodeURIComponent(parts.join('/')) : null;
+          if (ref && !ref.includes(':')) ref = ref.replace('/', ':');
+          return { id, ref };
+        };
+        const render = () => {
+          try {
+            if ((location.hash.replace(/^#/, '').split('/')[0] || '') === 'settings') { renderSettings(mount, desk); return; }
+            if ((location.hash.replace(/^#/, '').split('/')[0] || '') === 'company') { renderSettings(mount, desk, { company: true }); return; }
+            if (typeof current.render === 'function' && current.render.length >= 2 && extras.includes(current)) current.render(mount, store);
+            else current.render(mount, desk);
+          } catch (e) {
+            mount.innerHTML = `<h1 class="title">${store.esc(current.title)}</h1><p class="warnbar red">This station could not draw: ${store.esc(e?.message ?? e)}. Nothing was changed.</p>`;
+            console.error(e);
+          }
+          if (hasPlan) mount.insertAdjacentHTML('beforeend', '<p class="foot"><a href="plan.html">The plan behind this desk</a></p>');
+        };
+        // What a person has typed survives a re-draw that only changes the view. Each field is
+        // found again by its id (or its data-f / -d / -e name) inside the same record and the same
+        // line, and its typing is put back only where the station drew the same starting value as
+        // before: a station that changed the value on purpose (a Buy pre-filled from a source) wins.
+        const fieldKey = (el, seen) => {
+          const name = el.id || el.dataset.f || el.dataset.d || el.dataset.e;
+          if (!name || el.type === 'file') return null;
+          const box = el.closest('.open');
+          const ref = box?.previousElementSibling?.dataset?.ref || el.closest('[data-ref]')?.dataset.ref || '';
+          const base = `${ref}|${el.closest('[data-line]')?.dataset.line ?? ''}|${name}`;
+          seen[base] = (seen[base] ?? -1) + 1;
+          return base + '#' + seen[base];
+        };
+        const startOf = (el) => (el.type === 'checkbox' || el.type === 'radio') ? el.defaultChecked
+          : el.tagName === 'SELECT' ? ([...el.options].find((o) => o.defaultSelected) ?? el.options[0])?.value ?? ''
+          : el.defaultValue;
+        const nowOf = (el) => (el.type === 'checkbox' || el.type === 'radio') ? el.checked : el.value;
+        const typedFields = () => {
+          const out = new Map();
+          const seen = {};
+          for (const el of mount.querySelectorAll('input, textarea, select')) {
+            const k = fieldKey(el, seen);
+            if (k && nowOf(el) !== startOf(el)) out.set(k, { now: nowOf(el), start: startOf(el) });
+          }
+          return out;
+        };
+        const putFields = (saved) => {
+          if (!saved.size) return;
+          const seen = {};
+          for (const el of mount.querySelectorAll('input, textarea, select')) {
+            const k = fieldKey(el, seen);
+            const v = k && saved.get(k);
+            if (!v || startOf(el) !== v.start) continue;
+            if (el.type === 'checkbox' || el.type === 'radio') el.checked = v.now;
+            else if (el.tagName !== 'SELECT' || [...el.options].some((o) => o.value === v.now)) el.value = v.now;
+          }
+        };
+        // A field saved as the cursor leaves it (Inventory's rows) re-draws the page while the button
+        // pressed next is still under the finger, and a click whose press and release land on two
+        // different drawings is no click. So a re-draw asked for while the mouse or a finger is down
+        // on the page waits for its release, and the click lands first. A list's own pop-up is left
+        // out: its choice can arrive without a release the page ever hears.
+        let downOn = null;
+        let owed = null;
+        addEventListener('pointerdown', (e) => { downOn = e.target; }, true);
+        const letGo = () => {
+          downOn = null;
+          if (owed === null) return;
+          const keep = owed;
+          owed = null;
+          setTimeout(() => rerender(keep), 0);
+        };
+        addEventListener('pointerup', letGo, true);
+        addEventListener('pointercancel', letGo, true);
+        addEventListener('blur', letGo);
+        // the field the cursor is in, found again after the re-draw by the same key typing survives by
+        const fieldAt = (el) => {
+          const seen = {};
+          for (const f of mount.querySelectorAll('input, textarea, select')) { const k = fieldKey(f, seen); if (f === el) return k; }
+          return null;
+        };
+        const rerender = (keep = false) => {
+          if (!current) return;
+          if (downOn?.isConnected && downOn.tagName !== 'SELECT' && mount.contains(downOn)) { owed = owed || keep; return; }
+          const y = scrollY;
+          const saved = keep ? typedFields() : new Map();
+          const was = document.activeElement;
+          const at = was && mount.contains(was) ? fieldAt(was) : null;
+          let sel = null;
+          try { sel = at && typeof was.selectionStart === 'number' ? [was.selectionStart, was.selectionEnd] : null; } catch { sel = null; }
+          paintHeader();
+          paintTabs();
+          render();
+          putFields(saved);
+          if (at) {
+            const seen = {};
+            for (const f of mount.querySelectorAll('input, textarea, select')) {
+              if (fieldKey(f, seen) !== at) continue;
+              f.focus({ preventScroll: true });
+              try { if (sel) f.setSelectionRange(sel[0], sel[1]); } catch {}
+              break;
+            }
+          }
+          scrollTo(0, y);
+        };
+        const route = () => {
+          const head = (location.hash.replace(/^#/, '').split('/')[0] || '');
+          if (!store.settings.company && head !== 'settings' && head !== 'company') {
+            // the first-open page is no station: an address naming one (Find's list, a link) is put
+            // back to none, so the program never takes a station's tabs for this page (Fable's pass
+            // on 0.6.0 pressed Shelf here: the page stayed, and the program showed Shelf's tabs)
+            if (location.hash) {
+              const bare = location.href.replace(/#.*$/, '');
+              try { history.replaceState(null, '', bare); } catch { /* a page opened from a blob keeps its address */ }
+            }
+            $('desk').hidden = true;
+            setupEl.hidden = false;
+            renderSetup();
+            window.dispatchEvent(new Event('wc-ready'));
+            return;
+          }
+          setupEl.hidden = true;
+          $('desk').hidden = false;
+          if (head === 'settings') { paintHeader(); render(); window.dispatchEvent(new Event('wc-ready')); return; }
+          if (head === 'company') { paintHeader(); render(); window.dispatchEvent(new Event('wc-ready')); return; }
+          const { id, ref } = parse();
+          if (id === 'plan' && hasPlan) { location.href = 'plan.html'; return; }
+          current = all.find((s) => s.id === id) ?? all.find((s) => s.id === remembered()) ?? LINE[0];
+          // the address names the station on screen (an old door's name, or none, is put right),
+          // so Back, a bookmark and the program all read the same thing: the program shows this
+          // station's own web tabs by this name (warchief-desktop/main.js, follow)
+          const seg = location.hash.replace(/^#/, '').split('/');
+          if (seg[0] !== current.id) {
+            seg[0] = current.id;
+            const next = '#' + seg.filter(Boolean).join('/');
+            try { history.replaceState(null, '', next); } catch { try { location.hash = next; } catch { /* the blob page keeps the address it has */ } }
+          }
+          store.route = { module: current.id, ref };
+          remember(current.id);
+          paintHeader();
+          paintWarn();
+          paintTabs();
+          const find = (r) => (r ? mount.querySelector(`[data-ref="${window.CSS?.escape ? CSS.escape(r) : r}"]`) : null);
+          desk.fresh = true;
+          try { render(); } finally { desk.fresh = false; }
+          let target = find(ref);
+          // a record this station keeps but does not draw as a line of its own lands on the line that
+          // holds it (store.homeOf); with none, its own card says so. Fable's pass of 0.4.0 found an
+          // arrived purchase, a stock move, a source and a pay run landing on an unmarked page.
+          const ownType = !!ref && store.moduleFor(ref.split(':')[0]) === current.id;
+          if (!target && ownType) {
+            const home = store.homeOf(ref);
+            if (home) {
+              store.route = { module: current.id, ref: home };
+              desk.fresh = true;
+              try { render(); } finally { desk.fresh = false; store.route = { module: current.id, ref }; }
+              target = find(home);
+            }
+          }
+          if (target) {
+            target.classList.add('focus');
+            // a tall card (a bank file's lines) opens at its top, under the sticky header
+            target.scrollIntoView({ block: target.offsetHeight > innerHeight * 0.6 ? 'start' : 'center' });
+          } else {
+            scrollTo(0, 0);
+            if (ownType && store.resolve(ref)) openSlideOver(store, ref, desk, { notOn: current.id });
+            else if (ownType) toast('That one is not on the books any more, so there is nothing to show.');
+          }
+          window.dispatchEvent(new Event('wc-ready'));
+        };
+        addEventListener('hashchange', route);
+
+        // ── a record chip opens its card; the undo button and the keys ──────────────────────
+        document.addEventListener('click', (e) => {
+          const chip = e.target.closest?.('a.chip');
+          if (!chip) return;
+          const href = chip.getAttribute('href') ?? '';
+          const cut = href.indexOf('/');
+          if (!href.startsWith('#') || cut < 0) return;
+          const ref = decodeURIComponent(href.slice(cut + 1));
+          if (!ref.includes(':')) return;
+          e.preventDefault();
+          openSlideOver(store, ref, desk);
+        });
+        // a link to the address already showing (a card's "Open in" pressed from the record's own
+        // line, a toast's next step to where you stand) fires no hashchange, so it routes here instead
+        // of doing nothing (Fable's pass of 0.4.0). Only a record's address: a tab is left alone.
+        document.addEventListener('click', (e) => {
+          const a = e.target.closest?.('a[href^="#"]');
+          if (!a || e.defaultPrevented || a.classList.contains('chip') || !a.hash.includes(':') || a.hash !== location.hash) return;
+          route();
+        });
+        $('undo').addEventListener('click', doUndo);
+        $('palette-open').addEventListener('click', () => openPalette(store, all, desk));
+        document.addEventListener('keydown', (e) => {
+          const t = e.target;
+          const typing = /^(input|textarea|select)$/i.test(t?.tagName ?? '') || t?.isContentEditable;
+          if ((e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey)
+            || ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k')) {
+            e.preventDefault();
+            openPalette(store, all, desk);
+          } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing) {
+            e.preventDefault();
+            doUndo();
+          }
+        });
+
+        // ── the frame's bar, pressing back (the program only) ────────────────────────────
+        // 'settings' is the gear at the foot of the program's left bar: the company's settings on Books,
+        // or, before the company has a name, this first-open page's name field, which is its settings
+        window.deskCmd = (cmd, arg) => {
+          if (cmd === 'undo') doUndo();
+          else if (cmd === 'find') openPalette(store, all, desk);
+          else if (cmd === 'go') slideTo(String(arg ?? ''));
+          else if (cmd === 'settings' && !store.settings.company) setupEl.querySelector('#su-name')?.focus();
+          else if (cmd === 'settings') slideTo('books', undefined, 'company');
+          else if (cmd === 'site-add' || cmd === 'site-drop') siteCmd(cmd, arg);
+        };
+        // + Custom and × at the foot of the program's left bar: a site of the person's own joins the
+        // station's chips, or leaves them, as one act with Undo (the program opens a new one at once)
+        const siteCmd = (cmd, arg) => {
+          let a = null;
+          try { a = JSON.parse(String(arg)); } catch { return; }
+          const st = all.find((s) => s.id === a?.station && s.web);
+          const name = String(a?.name ?? '').trim().slice(0, 40);
+          const url = String(a?.url ?? '').trim();
+          if (!st || !/^https:\/\/\S+$/i.test(url)) return;
+          if (cmd === 'site-add') {
+            if (!name || sitesOf(st).some((c) => c.url === url)) return;
+            const key = st.web.keys[0];
+            desk.act(() => ({ act: store.conf({ [key]: [...(store.settings[key] ?? []), { name, url }] }, `added ${name} to ${st.title}`) }));
+            return;
+          }
+          const key = st.web.keys.find((k) => (store.settings[k] ?? []).some((c) => c?.url === url));
+          if (!key) return;
+          const gone = store.settings[key].find((c) => c?.url === url);
+          desk.act(() => ({ act: store.conf({ [key]: store.settings[key].filter((c) => c?.url !== url) }, `took ${gone.name} off ${st.title}`) }));
+        };
+
+        // ── a swipe across the page: the next station slides in from the right ─────────────
+        // Matt, 2026-10-04 20:47Z: "when the inventory swipes away left the shelf (any next tab in
+        // sequence) slides in from the right". A drag of 70 px or more, further across than down,
+        // that began on the page's background: not on a field, a button, a link or a part that
+        // scrolls sideways, so typing, a tap and a wide table's own scroll are never a swipe. A
+        // station pressed on the frame's bar slides the same way, toward where it stands in the
+        // line; with motion reduced in the system's settings the page simply changes.
+        const slideTo = (id, dir, ref = '') => {
+          const ids = all.map((s) => s.id);
+          const from = ids.indexOf(current?.id);
+          const to = ids.indexOf(id);
+          const hash = '#' + id + (ref ? '/' + ref : '');
+          if (to < 0) return;
+          if (to === from) { if (ref) desk.go(hash); return; } // a place on the station on screen: no slide
+          dir ??= to > from ? 'left' : 'right';
+          if (matchMedia('(prefers-reduced-motion: reduce)').matches) { desk.go(hash); return; }
+          const out = dir === 'left' ? 'off-left' : 'off-right';
+          const back = dir === 'left' ? 'off-right' : 'off-left';
+          mount.classList.add('sliding', out);
+          setTimeout(() => {
+            mount.classList.remove('sliding', out);
+            mount.classList.add(back);
+            const slideIn = () => {
+              void mount.offsetWidth; // the start state lands before the transition begins
+              mount.classList.add('sliding');
+              mount.classList.remove(back);
+              setTimeout(() => mount.classList.remove('sliding'), 220);
+            };
+            // route runs on hashchange first (it was listening before this), then the page comes in
+            if (location.hash === hash) { route(); slideIn(); } else { addEventListener('hashchange', slideIn, { once: true }); location.hash = hash; }
+          }, 180);
+        };
+        let swipe = null;
+        mount.addEventListener('pointerdown', (e) => {
+          swipe = null;
+          if (e.button !== 0 || e.target.closest?.('input, textarea, select, button, a, label, [contenteditable], [draggable="true"]')) return;
+          for (let el = e.target; el && el !== mount; el = el.parentElement) {
+            if (el.scrollWidth > el.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(el).overflowX)) return;
+          }
+          swipe = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        });
+        addEventListener('pointerup', (e) => {
+          if (!swipe || e.pointerId !== swipe.id) return;
+          const dx = e.clientX - swipe.x;
+          const dy = e.clientY - swipe.y;
+          swipe = null;
+          if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          const ids = all.map((s) => s.id);
+          const to = ids[ids.indexOf(current?.id) + (dx < 0 ? 1 : -1)];
+          if (to) slideTo(to, dx < 0 ? 'left' : 'right');
+        });
+        addEventListener('pointercancel', () => { swipe = null; });
+
+        // ── the account's standing, in the program only ──────────────────────────────────
+        // The program signs the user in and knows where the account stands (warchief-desktop/main.js,
+        // accountState): the free 30 days of Gold, a paid Gold, or free days ended. It tells the desk
+        // on every change, and the desk asks once as it boots. On the site there is no standing to
+        // show, and the line stays hidden.
+        const acct = $('co-acct');
+        window.deskAccount = (state) => {
+          const s = state?.standing;
+          let line = '';
+          if (s?.paid) line = 'Gold membership';
+          else if (s?.trial) {
+            const left = Math.max(0, Math.ceil((new Date(s.trialEnds).getTime() - Date.now()) / 86400000));
+            line = `Gold trial · ${left} ${left === 1 ? 'day' : 'days'} left`;
+          } else if (s?.expired && !s.locked) line = 'Free days ended · the desk stays open until checkout opens, then it asks you to pay to continue';
+          if (line && state?.offline) line += ' · offline';
+          acct.textContent = line;
+          acct.hidden = !line;
+          acctText = line;
+          // whether the cloud is offered can arrive after the desk opened (main.js syncCloud)
+          const saves = state?.saves === 'cloud' ? 'cloud' : 'computer';
+          if (saves !== savesTo || (state?.cloud === true) !== offerCloud) {
+            savesTo = saves;
+            offerCloud = state?.cloud === true;
+            if (!setupEl.hidden) renderSetup();
+            paintHeader();
+          }
+          tellProgram();
+        };
+        if (acct0) window.deskAccount(acct0);
+        if (store.mode === 'program') { site.load(desk); loadMailer(desk); }
+
+        // ── something dropped on the desk is read and sent where it belongs ──────────────
+        // A file (a bank's, PayPal's, a label service's) is read as a file. Words or a table's rows
+        // dragged out of a web page are read by files.readDropped: a label fills its order on Ship,
+        // a supplier's receipt fills Buy on Inventory and a link alone waits in its Sources row
+        // (Matt, 2026-10-04 20:47Z), money waits on Books, and nothing is booked until a tap says so (Matt, 2026-10-04 01:53Z:
+        // "you drag and drop that info onto the side of browser and it updates the desk"). A drop
+        // into a field types into that field, as it always has.
+        const route_file = (result, name) => {
+          if (result.kind === 'money') { desk.go('#books/file:' + books.take(result, name)); return result.kind; }
+          if (result.kind === 'shipments') { ship.take(result, name); desk.go('#ship'); return result.kind; }
+          toast(`${name} is not a file the desk reads yet. Its first line: "${result.first || 'empty'}"`, { error: true });
+          return result.kind;
+        };
+        const takeFile = async (file) => {
+          let text;
+          try { text = await readText(file); } catch (e) { toast(e?.message ?? String(e), { error: true }); return; }
+          if (/\.json$/i.test(file.name)) {
+            try {
+              const j = JSON.parse(text);
+              if (j?.app === 'war-chief' && j.files) { books.takeBackup(j, file.name); desk.go('#books'); return; }
+            } catch {}
+          }
+          route_file(readFile(text, file.name), file.name);
+        };
+        desk.takeFile = takeFile;
+        const takeText = (text) => {
+          const r = readDropped(String(text ?? ''));
+          if (r.kind === 'money' || r.kind === 'shipments') return route_file(r, 'From a web page, ' + new Date().toLocaleTimeString());
+          if (r.kind === 'label') {
+            const to = ship.takeLabel(store, r);
+            desk.go(to.hash);
+            toast(to.say);
+            return 'label';
+          }
+          // a supplier's receipt fills Inventory's Buy form; a link alone waits in its Sources row
+          if (r.kind === 'receipt' || r.kind === 'link') {
+            const to = r.kind === 'receipt' ? inventory.takeReceipt(store, r) : inventory.takeLink(store, r);
+            desk.go(to.hash);
+            toast(to.say);
+            return r.kind;
+          }
+          toast('Nothing to book in that: ' + r.why + '.', { error: true });
+          return 'unknown';
+        };
+        // the program hands over a file one of its web tabs downloaded, by name and text, and hears
+        // back what it was: 'money' (now on Books), 'shipments' (now on Ship) or 'unknown'
+        window.deskDrop = (name, text) => route_file(readFile(String(text ?? ''), String(name ?? 'file')), String(name ?? 'file'));
+        let depth = 0;
+        let ownDrag = false; // a drag that began on the desk itself is the desk's own business
+        const kinds = (e) => [...(e.dataTransfer?.types ?? [])];
+        const hasFiles = (e) => kinds(e).includes('Files');
+        const hasWords = (e) => !ownDrag && (kinds(e).includes('text/plain') || kinds(e).includes('text/uri-list'));
+        const intoField = (e) => !!e.target?.closest?.('input, textarea, select, [contenteditable]');
+        addEventListener('dragstart', () => { ownDrag = true; });
+        addEventListener('dragend', () => { ownDrag = false; });
+        addEventListener('dragenter', (e) => { if (hasFiles(e) || hasWords(e)) { depth++; document.body.classList.add('dragging'); } });
+        addEventListener('dragleave', () => { depth = Math.max(0, depth - 1); if (!depth) document.body.classList.remove('dragging'); });
+        addEventListener('dragover', (e) => { if (hasFiles(e) || (hasWords(e) && !intoField(e))) e.preventDefault(); });
+        addEventListener('drop', async (e) => {
+          const files = hasFiles(e);
+          const words = !files && hasWords(e) && !intoField(e);
+          depth = 0;
+          document.body.classList.remove('dragging');
+          if (!files && !words) return;
+          e.preventDefault();
+          if (files) { for (const f of e.dataTransfer.files) await takeFile(f); return; }
+          takeText(e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list'));
+        });
+
+        route();
+      };
+
+      window.BOS_READY.then(boot).catch((err) => {
+        const m = document.getElementById('os-mount');
+        document.getElementById('desk').hidden = false;
+        if (m) m.innerHTML = `<p class="warnbar red">The desk did not load: ${String(err).replace(/[&<>]/g, '')}</p>`;
+      });
+    </script>
+  </body>
+</html>
